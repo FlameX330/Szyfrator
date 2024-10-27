@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Szyfrator Online</title>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Courier Prime', monospace;
+            background-color: #000;
+            color: #00FF00;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+            position: relative;
+            overflow-y: auto;
+            height: 100vh;
+        }
+        h1 {
+            font-size: 2.5em;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: rgba(28, 28, 28, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 4px 8px rgba(0, 255, 0, 0.3);
+            transition: background 0.3s;
+            position: relative;
+            z-index: 1;
+        }
+        textarea, input, select, button {
+            width: 90%;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border: none;
+            font-size: 1em;
+            background: #2c2c2c;
+            color: #00FF00;
+        }
+        button {
+            background-color: #00FF00;
+            color: black;
+            cursor: pointer;
+            transition: background-color 0.3s, box-shadow 0.3s;
+            box-shadow: 0 0 5px #00FF00, 0 0 10px #00FF00, 0 0 15px #00FF00;
+        }
+        button:hover {
+            background-color: #00cc00;
+            box-shadow: 0 0 10px #00FF00, 0 0 20px #00FF00, 0 0 30px #00FF00;
+        }
+        .result, .password-strength {
+            background: #3c3c3c;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .decrypted-word {
+            font-weight: bold;
+        }
+        .likely-word {
+            text-decoration: underline;
+            color: yellow;
+        }
+        .toggle-container {
+            margin: 20px 0;
+        }
+        .toggle-label {
+            display: inline-block;
+            width: 60px;
+            height: 30px;
+            background-color: #00FF00;
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+        }
+        .toggle-label:before {
+            content: '';
+            position: absolute;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: #000;
+            top: 1px;
+            left: 1px;
+            transition: transform 0.3s;
+        }
+        .toggle-input {
+            display: none;
+        }
+        .toggle-input:checked + .toggle-label:before {
+            transform: translateX(30px);
+        }
+        .number {
+            position: absolute;
+            color: #08000;
+            font-size: 20px;
+            opacity: 0.8;
+            animation: float 10s infinite;
+        }
+        @keyframes float {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100vh); }
+        }
+
+        /* Nowa animacja dla znaków szyfrujących */
+        .cipher-char {
+            position: absolute;
+            font-size: 24px;
+            color: #00FF00;
+            opacity: 0.7;
+            animation: move 8s linear infinite;
+            white-space: nowrap;
+        }
+
+        @keyframes move {
+            0% {
+                transform: translateY(0) translateX(0);
+            }
+            25% {
+                transform: translateY(-50vh) translateX(20vw);
+            }
+            50% {
+                transform: translateY(-100vh) translateX(-20vw);
+            }
+            75% {
+                transform: translateY(-150vh) translateX(20vw);
+            }
+            100% {
+                transform: translateY(-200vh) translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Szyfrator Online</h1>
+    <div class="toggle-container">
+        <input type="checkbox" id="themeToggle" class="toggle-input" onchange="toggleTheme()">
+        <label for="themeToggle" class="toggle-label"></label>
+    </div>
+
+    <div class="container">
+        <textarea id="inputText" placeholder="Wpisz tekst do szyfrowania..." oninput="clearResults()"></textarea>
+        <input type="text" id="key" placeholder="Wprowadź klucz (1-31)" oninput="clearResults()">
+        
+        <label for="cipherMethod">Wybierz metodę szyfrowania:</label>
+        <select id="cipherMethod" onchange="clearResults()">
+            <option value="caesar">Cezara</option>
+            <option value="xor">XOR</option>
+            <option value="vigenere">Vigenère</option>
+            <option value="atbash">Atbash</option>
+            <option value="rot13">ROT13</option>
+        </select>
+        
+        <button onclick="encrypt()">Szyfruj</button>
+        <button onclick="decrypt()">Odszyfruj</button>
+        
+        <div class="result" id="outputText"></div>
+
+        <h2>Testowanie siły hasła</h2>
+        <input type="text" id="passwordInput" placeholder="Wpisz hasło">
+        <button onclick="checkPasswordStrength()">Sprawdź siłę</button>
+        <div class="password-strength" id="passwordStrength"></div>
+
+        <h2>Generator haseł</h2>
+        <input type="number" id="passwordLength" placeholder="Długość hasła (8-20)" min="8" max="20">
+        <button onclick="generatePassword()">Generuj hasło</button>
+        <div class="password-strength" id="generatedPassword"></div>
+    </div>
+
+    <div id="backgroundNumbers"></div>
+
+    <script>
+        function createRandomNumbers() {
+            const backgroundNumbers = document.getElementById("backgroundNumbers");
+            for (let i = 0; i < 50; i++) {
+                const number = document.createElement("div");
+                number.className = "number";
+                number.textContent = Math.floor(Math.random() * 10);
+                number.style.left = Math.random() * 100 + "vw";
+                number.style.animationDuration = (Math.random() * 5 + 5) + "s";
+                number.style.fontSize = (Math.random() * 30 + 10) + "px";
+                backgroundNumbers.appendChild(number);
+            }
+
+            // Dodanie znaków szyfrujących
+            const cipherChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+            for (let i = 0; i < 20; i++) {
+                const cipherChar = document.createElement("div");
+                cipherChar.className = "cipher-char";
+                cipherChar.textContent = cipherChars.charAt(Math.floor(Math.random() * cipherChars.length));
+                cipherChar.style.left = Math.random() * 100 + "vw";
+                cipherChar.style.fontSize = (Math.random() * 30 + 15) + "px";
+                cipherChar.style.animationDuration = (Math.random() * 10 + 5) + "s"; // Losowy czas animacji
+                cipherChar.style.animationDelay = (Math.random() * 5) + "s"; // Losowe opóźnienie
+                backgroundNumbers.appendChild(cipherChar);
+            }
+        }
+
+        function clearResults() {
+            document.getElementById("outputText").innerHTML = "";
+            document.getElementById("passwordStrength").innerHTML = "";
+            document.getElementById("generatedPassword").innerHTML = "";
+        }
+
+        function encrypt() {
+            clearResults();
+            const text = document.getElementById("inputText").value;
+            const key = parseInt(document.getElementById("key").value);
+            const method = document.getElementById("cipherMethod").value;
+            let result = "";
+
+            if (method === "caesar") {
+                result = caesarCipher(text, key);
+            } else if (method === "xor") {
+                result = xorCipher(text, String(key));
+            } else if (method === "vigenere") {
+                result = vigenereCipher(text, String(key));
+            } else if (method === "atbash") {
+                result = atbashCipher(text);
+            } else if (method === "rot13") {
+                result = rot13Cipher(text);
+            }
+            
+            document.getElementById("outputText").innerHTML = "Zaszyfrowany tekst: " + result;
+        }
+
+        function decrypt() {
+            clearResults();
+            const text = document.getElementById("inputText").value;
+            const method = document.getElementById("cipherMethod").value;
+            let results = "";
+
+            if (method === "caesar") {
+                for (let i = 1; i <= 31; i++) {
+                    const decryptedWord = caesarCipher(text, -i);
+                    results += decryptedWord + "<br>";
+                }
+            } else if (method === "xor") {
+                for (let i = 0; i < 128; i++) {
+                    const decryptedWord = xorCipher(text, String.fromCharCode(i));
+                    results += decryptedWord + "<br>";
+                }
+            } else if (method === "vigenere") {
+                results = vigenereDecipher(text, document.getElementById("key").value);
+            } else if (method === "atbash") {
+                results = atbashCipher(text);
+            } else if (method === "rot13") {
+                results = rot13Cipher(text);
+            }
+            
+            document.getElementById("outputText").innerHTML = results;
+        }
+
+        function caesarCipher(text, shift) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            const shiftedAlphabet = alphabet.slice(shift) + alphabet.slice(0, shift);
+            return text.split("").map(char => {
+                const index = alphabet.indexOf(char);
+                if (index !== -1) {
+                    return shiftedAlphabet[index];
+                }
+                return char;
+            }).join("");
+        }
+
+        function xorCipher(text, key) {
+            return text.split("").map(char => String.fromCharCode(char.charCodeAt(0) ^ key.charCodeAt(0))).join("");
+        }
+
+        function vigenereCipher(text, key) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            let keyIndex = 0;
+            return text.split("").map(char => {
+                const index = alphabet.indexOf(char);
+                if (index !== -1) {
+                    const shift = alphabet.indexOf(key[keyIndex % key.length]);
+                    const newIndex = (index + shift) % alphabet.length;
+                    keyIndex++;
+                    return alphabet[newIndex];
+                }
+                return char;
+            }).join("");
+        }
+
+        function vigenereDecipher(text, key) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            let keyIndex = 0;
+            return text.split("").map(char => {
+                const index = alphabet.indexOf(char);
+                if (index !== -1) {
+                    const shift = alphabet.indexOf(key[keyIndex % key.length]);
+                    const newIndex = (index - shift + alphabet.length) % alphabet.length;
+                    keyIndex++;
+                    return alphabet[newIndex];
+                }
+                return char;
+            }).join("");
+        }
+
+        function atbashCipher(text) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            const reversedAlphabet = alphabet.split("").reverse().join("");
+            return text.split("").map(char => {
+                const index = alphabet.indexOf(char);
+                if (index !== -1) {
+                    return reversedAlphabet[index];
+                }
+                return char;
+            }).join("");
+        }
+
+        function rot13Cipher(text) {
+            const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+            const shiftedAlphabet = alphabet.slice(13) + alphabet.slice(0, 13);
+            return text.split("").map(char => {
+                const index = alphabet.indexOf(char);
+                if (index !== -1) {
+                    return shiftedAlphabet[index];
+                }
+                return char;
+            }).join("");
+        }
+
+        function checkPasswordStrength() {
+            const password = document.getElementById("passwordInput").value;
+            const strengthDisplay = document.getElementById("passwordStrength");
+            let strength = "Słabe";
+
+            if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password) && /[^A-Za-z0-9]/.test(password)) {
+                strength = "Bardzo mocne";
+            } else if (password.length >= 6 && /[A-Z]/.test(password)) {
+                strength = "Średnie";
+            } else if (password.length >= 6) {
+                strength = "Słabe";
+            }
+
+            strengthDisplay.innerHTML = "Siła hasła: " + strength;
+        }
+
+        function generatePassword() {
+            const length = parseInt(document.getElementById("passwordLength").value);
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+            let password = "";
+            for (let i = 0; i < length; i++) {
+                password += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            document.getElementById("generatedPassword").innerHTML = "Wygenerowane hasło: " + password;
+        }
+
+        function toggleTheme() {
+            const isChecked = document.getElementById("themeToggle").checked;
+            document.body.style.backgroundColor = isChecked ? "#fff" : "#000";
+            document.body.style.color = isChecked ? "#000" : "#00FF00";
+            document.querySelector('.container').style.backgroundColor = isChecked ? "#f0f0f0" : "#1c1c1c";
+            document.querySelectorAll('input, select').forEach(element => {
+                element.style.backgroundColor = isChecked ? "#ddd" : "#2c2c2c";
+                element.style.color = isChecked ? "#000" : "#00FF00";
+            });
+        }
+
+        createRandomNumbers();
+    </script>
+</body>
+</html>
